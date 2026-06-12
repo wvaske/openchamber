@@ -1449,9 +1449,10 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     };
   }, [currentDirectory, debouncedSearchQuery, searchFiles, showHidden, showGitignored]);
 
-  const readFile = React.useCallback(async (path: string, options?: { allowOutsideWorkspace?: boolean; outsideFileGrant?: string; optional?: boolean }): Promise<string> => {
+  const readFile = React.useCallback(async (path: string, options?: { allowOutsideWorkspace?: boolean; outsideFileGrant?: string; optional?: boolean; directory?: string }): Promise<string> => {
+    const effectiveDirectory = options?.directory ?? root ?? undefined;
     if (files.readFile) {
-      const result = await files.readFile(path, options);
+      const result = await files.readFile(path, { ...options, directory: effectiveDirectory });
       return result.content ?? '';
     }
 
@@ -1465,6 +1466,9 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     if (options?.optional) {
       params.set('optional', 'true');
     }
+    if (effectiveDirectory) {
+      params.set('directory', effectiveDirectory);
+    }
     const response = await runtimeFetch(`/api/fs/read?${params.toString()}`, {
       // Avoid conditional requests (304 + empty body).
       cache: options?.optional ? 'no-store' : 'default',
@@ -1474,11 +1478,12 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       throw new Error((error as { error?: string }).error || t('filesView.error.readFileFailed'));
     }
     return response.text();
-  }, [files, t]);
+  }, [files, root, t]);
 
-  const readFileStat = React.useCallback(async (path: string, options?: { allowOutsideWorkspace?: boolean; outsideFileGrant?: string }): Promise<FileStatSnapshot | null> => {
+  const readFileStat = React.useCallback(async (path: string, options?: { allowOutsideWorkspace?: boolean; outsideFileGrant?: string; directory?: string }): Promise<FileStatSnapshot | null> => {
     if (files.statFile) {
-      const result = await files.statFile(path, options);
+      const effectiveDirectory = options?.directory ?? root ?? undefined;
+      const result = await files.statFile(path, { ...options, directory: effectiveDirectory });
       return {
         path: result.path,
         size: result.size,
@@ -1486,7 +1491,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       };
     }
     return null;
-  }, [files]);
+  }, [files, root]);
 
   React.useEffect(() => {
     if (!root || !files.statFile || openPaths.length === 0) {

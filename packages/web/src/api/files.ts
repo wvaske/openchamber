@@ -128,6 +128,9 @@ export const createWebFilesAPI = ({ urls }: WebFilesAPIOptions): FilesAPI => ({
     if (options?.outsideFileGrant) {
       params.set('outsideFileGrant', options.outsideFileGrant);
     }
+    if (options?.directory) {
+      params.set('directory', normalizePath(options.directory));
+    }
     const response = await runtimeFetch(urls.api('/api/fs/stat', params));
 
     if (!response.ok) {
@@ -155,6 +158,9 @@ export const createWebFilesAPI = ({ urls }: WebFilesAPIOptions): FilesAPI => ({
     }
     if (options?.optional) {
       params.set('optional', 'true');
+    }
+    if (options?.directory) {
+      params.set('directory', normalizePath(options.directory));
     }
     const response = await runtimeFetch(urls.api('/api/fs/read', params), {
       cache: options?.optional ? 'no-store' : 'default',
