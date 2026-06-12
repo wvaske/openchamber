@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Files: fixed "Path is outside of active workspace" errors when opening files after switching projects while a worktree session was active. The stale `lastDirectory` in server settings was being used as the workspace root; file reads now pass the current project directory explicitly.
+
 ## [1.12.4] - 2026-06-11
 
 - Chat: added `/handoff-review` to open a linked review session for the current workspace changes, with actions to send review feedback and implementation replies between the sessions.

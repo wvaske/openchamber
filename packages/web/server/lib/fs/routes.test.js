@@ -427,7 +427,67 @@ describe('fs read', () => {
     expect(res.body).toBe('');
     expect(fsPromises.readFile).toHaveBeenCalledTimes(4);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Read retry exhausted for /repo/file.txt'));
-    warn.mockRestore();
+     warn.mockRestore();
+  });
+});
+
+describe('fs read - directory query param', () => {
+  const registerReadWithDynamicDirectory = (fsPromises) => {
+    const { app, getRoute } = createRouteRegistry();
+    registerFsRoutes(app, {
+      os: { homedir: () => '/home/user' },
+      path: path.posix,
+      fsPromises: {
+        realpath: async (targetPath) => targetPath,
+        ...fsPromises,
+      },
+      spawn: vi.fn(),
+      crypto: { randomUUID: () => 'job-0' },
+      normalizeDirectoryPath: (p) => p,
+      resolveProjectDirectory: async (req) => {
+        const dir = Array.isArray(req.query?.directory)
+          ? req.query.directory[0]
+          : req.query?.directory;
+        return { directory: dir || '/repo', error: null };
+      },
+      buildAugmentedPath: () => '/usr/bin',
+      resolveGitBinaryForSpawn: () => 'git',
+      openchamberUserConfigRoot: '/home/user/.config',
+    });
+    return getRoute('GET', '/api/fs/read');
+  };
+
+  it('uses the directory query param as workspace root instead of the server default', async () => {
+    const fsPromises = {
+      stat: vi.fn(async () => ({ isFile: () => true, size: 5 })),
+      readFile: vi.fn(async () => 'hello'),
+    };
+    const handler = registerReadWithDynamicDirectory(fsPromises);
+
+    const res = await callRead(handler, {
+      path: '/other-project/file.txt',
+      directory: '/other-project',
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe('hello');
+  });
+
+  it('rejects a file outside the directory query param workspace', async () => {
+    const fsPromises = {
+      stat: vi.fn(async () => ({ isFile: () => true, size: 5 })),
+      readFile: vi.fn(async () => 'hello'),
+    };
+    const handler = registerReadWithDynamicDirectory(fsPromises);
+
+    const res = await callRead(handler, {
+      path: '/other-project/file.txt',
+      directory: '/repo',
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'Path is outside of active workspace' });
+    expect(fsPromises.readFile).not.toHaveBeenCalled();
   });
 });
 
